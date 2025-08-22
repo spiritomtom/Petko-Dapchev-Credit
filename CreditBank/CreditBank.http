@@ -1,0 +1,6 @@
+@CreditBank_HostAddress = http://localhost:5048
+
+GET {{CreditBank_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
