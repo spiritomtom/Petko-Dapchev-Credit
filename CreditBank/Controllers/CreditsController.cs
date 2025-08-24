@@ -46,5 +46,42 @@ namespace CreditBank.Controllers
 
             return Ok(creditRequestContract);
         }
+
+        [HttpGet]
+        [Route("")]
+        [ProducesResponseType(typeof(IEnumerable<CreditRequestContract>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public ActionResult<IEnumerable<CreditRequestContract>> GetAllAvailableCredits([FromQuery] CreditStatusEnum? status, [FromQuery] CreditTypeEnum? type)
+        {
+            var creditRequestsQuery = _context.CreditRequests.AsQueryable();
+
+            if (status.HasValue)
+            {
+                creditRequestsQuery = creditRequestsQuery.Where(cr => cr.Status == status.Value);
+            }
+
+            if (type.HasValue)
+            {
+                creditRequestsQuery = creditRequestsQuery.Where(cr => cr.CreditType == type.Value);
+            }
+
+            var creditRequests = creditRequestsQuery.ToList();
+
+            if (!creditRequests.Any())
+            {
+                return NotFound(new { Message = "No credit requests found" });
+            }
+
+            var creditRequestContracts = creditRequests.Select(creditRequest => new CreditRequestContract
+            {
+                FullName = creditRequest.FullName,
+                Email = creditRequest.Email,
+                CreditAmount = creditRequest.CreditAmount,
+                TypeEnum = creditRequest.CreditType,
+                MonthlyIncome = creditRequest.MonthlyIncome
+            }).ToList();
+
+            return Ok(creditRequestContracts);
+        }
     }
 }
