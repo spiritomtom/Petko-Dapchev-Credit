@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using CreditBank.Database;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +13,7 @@ builder.Services.AddDbContext<CreditDbContext>(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:3000/")
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
