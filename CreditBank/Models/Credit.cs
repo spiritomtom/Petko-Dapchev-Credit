@@ -1,15 +1,16 @@
-﻿using CreditBank.Contracts.Enums;
+﻿using CreditBank.Contracts;
 
 namespace CreditBank.Models;
 
 public class Credit(Guid creditRequestId, double amount, CreditTypeEnum typeEnum)
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid CreditRequestId { get; set; } = creditRequestId;
-    public double Amount { get; set; } = amount;
+    public Guid CreditRequestId { get; set; }
+    public double Amount { get; set; }
     public DateTime StartDate { get; set; } = DateTime.UtcNow;
-    public DateTime? EndDate { get; set; } = null;
-    public CreditTypeEnum TypeEnum { get; set; } = typeEnum;
-    public CreditStatusEnum Status { get; set; } = CreditStatusEnum.Ongoing;
-    public CreditRequest CreditRequest { get; }
+    public DateTime? EndDate { get; set; }
+    public CreditTypeEnum TypeEnum { get; set; }
+    public CreditStatusEnum Status { get; set; } = CreditStatusEnum.PendingReview;
+
+    public CreditRequest CreditRequest { get; set; }
 }

@@ -1,6 +1,4 @@
-﻿using CreditBank.Contracts.Enums;
-
-namespace CreditBank.Contracts;
+﻿namespace CreditBank.Contracts;
 
 public class CreditRequestContract
 {

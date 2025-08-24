@@ -1,10 +1,20 @@
-﻿namespace CreditBank.Models;
+﻿using System;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class Payment
+namespace CreditBank.Models
 {
-    public Guid Id { get; set; }
-    public double Amount { get; set; }
-    public DateTime PaymentDate { get; set; }
-    public Client Client { get; set; }
-    public Credit Credit { get; set; }
+    public class Payment
+    {
+        public Guid Id { get; set; }
+        public double Amount { get; set; }
+        public DateTime PaymentDate { get; set; }
+        public Guid CreditId { get; set; }
+        public Guid UserId { get; set; }
+
+        [ForeignKey("UserId")]
+        public User User { get; set; }
+
+        [ForeignKey("CreditId")]
+        public Credit Credit { get; set; }
+    }
 }

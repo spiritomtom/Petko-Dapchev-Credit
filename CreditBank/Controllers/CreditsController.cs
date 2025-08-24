@@ -1,5 +1,4 @@
 ﻿using CreditBank.Contracts;
-using CreditBank.Contracts.Enums;
 using CreditBank.Database;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,11 +8,50 @@ namespace CreditBank.Controllers;
 [Route("[controller]")]
 public class CreditsController(CreditDbContext context) : ControllerBase
 {
+    //Gets all credit requests, with optional filtering by status and type
+    // Returns 404 if no credit requests are found
+
+    [HttpGet]
+    [Route("")]
+    [ProducesResponseType(typeof(IEnumerable<CreditRequestContract>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public ActionResult<IEnumerable<CreditRequestContract>> GetAllAvailableCredits([FromQuery] CreditStatusEnum? status, [FromQuery] CreditTypeEnum? type)
+    {
+        var creditRequestsQuery = context.CreditRequests.AsQueryable();
+
+        if (status.HasValue)
+        {
+            creditRequestsQuery = creditRequestsQuery.Where(cr => cr.Status == status.Value);
+        }
+
+        if (type.HasValue)
+        {
+            creditRequestsQuery = creditRequestsQuery.Where(cr => cr.CreditType == type.Value);
+        }
+
+        var creditRequests = creditRequestsQuery.ToList();
+
+        if (!creditRequests.Any())
+        {
+            return NotFound(new { Message = "No credit requests found" });
+        }
+
+        var creditRequestContracts = creditRequests.Select(creditRequest => new CreditRequestContract
+        {
+            FullName = creditRequest.FullName,
+            Email = creditRequest.Email,
+            CreditAmount = creditRequest.CreditAmount,
+            TypeEnum = creditRequest.CreditType,
+            MonthlyIncome = creditRequest.MonthlyIncome
+        }).ToList();
+
+        return Ok(creditRequestContracts);
+    }
 
     [HttpGet]
     [Route("{creditRequestId}")]
     [ProducesResponseType(typeof(CreditRequestContract), StatusCodes.Status200OK)]
-    public ActionResult<CreditRequestContract> GetAvailableCredits([FromRoute] Guid creditRequestId)
+    public ActionResult<CreditRequestContract> GetCredit([FromRoute] Guid creditRequestId)
     {
         var creditRequest = context.CreditRequests.Find(creditRequestId);
         if (creditRequest == null)
@@ -25,7 +63,7 @@ public class CreditsController(CreditDbContext context) : ControllerBase
             FullName = creditRequest.FullName,
             Email = creditRequest.Email,
             CreditAmount = creditRequest.CreditAmount,
-            TypeEnum = creditRequest.TypeEnum,
+            TypeEnum = creditRequest.CreditType,
             MonthlyIncome = creditRequest.MonthlyIncome
         };
 
@@ -38,7 +76,7 @@ public class CreditsController(CreditDbContext context) : ControllerBase
     public IActionResult ApplyForCredit([FromBody] CreditRequestContract request)
     {
         context.AddCreditRequest(request);
-        return CreatedAtAction(nameof(GetAvailableCredits), request);
+        return CreatedAtAction(nameof(GetCredit), request);
     }
 
     [ProducesResponseType(StatusCodes.Status200OK)]
