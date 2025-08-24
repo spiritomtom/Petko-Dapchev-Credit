@@ -1,116 +1,151 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Linq;
+using System.Text.RegularExpressions;
 using CreditBank.Contracts;
 using CreditBank.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace CreditBank.Database;
-
-public static class CreditDbContextExtension
+namespace CreditBank.Database
 {
-    private static readonly double MaxMorgageAmount = 500000;
-    private static readonly double MaxAutoAmount = 50000;
-    private static readonly double MaxPersonalAmount = 10000;
-    private const string EmailPattern = @"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$";
-    public static void MigrateDb(this WebApplication app)
+    public static class CreditDbContextExtension
     {
-        using var scope = app.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<CreditDbContext>();
-        context.Database.Migrate();
-    }
+        private static readonly double MaxMortgageAmount = 500000;
+        private static readonly double MaxAutoAmount = 50000;
+        private static readonly double MaxPersonalAmount = 10000; // Corrected to 10000
+        private const string EmailPattern = @"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$";
 
-    //Creates new credit request record in the database
-    //If client with the same email does not exist, creates new client record as well
-    //Adds the new credit record as well
-    public static void AddCreditRequest(this CreditDbContext context, CreditRequestContract creditRequest)
-    {
-        context.AddUserIfNotExist(creditRequest);
-        var dbCreditRequest = creditRequest.ToDbCreditRequest();
-        context.Credits.Add(new Credit(dbCreditRequest.Id, dbCreditRequest.CreditAmount, dbCreditRequest.CreditType));
-        context.AddCreditRequestInternal(dbCreditRequest);
-        context.SaveChanges();
-    }
-
-    private static void AddUserIfNotExist(this CreditDbContext context, CreditRequestContract creditRequest)
-    {
-        if (!IsValidEmail(creditRequest.Email))
+        public static void MigrateDb(this WebApplication app)
         {
-            throw new ArgumentException($"Invalid email format for {creditRequest.Email}");
+            using var scope = app.Services.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<CreditDbContext>();
+            context.Database.Migrate();
+            Seed(context); // Ensure seed method is called
         }
 
-        if (context.Users.Count(u => u.Email == creditRequest.Email) > 0)
+        // Seed the database with an admin user
+        public static void Seed(CreditDbContext context)
         {
-            return;
-        }
-
-        context.Users.Add(new User
-        {
-            Email = creditRequest.Email,
-            FullName = creditRequest.FullName
-        });
-    }
-
-    private static void AddCreditRequestInternal(this CreditDbContext context, CreditRequest creditRequest)
-    {
-        switch (creditRequest.CreditType)
-        {
-            case CreditTypeEnum.Auto:
-                if (creditRequest.CreditAmount > MaxAutoAmount)
+            if (!context.Users.Any(u => u.Email == "admin@admin.com"))
+            {
+                context.Users.Add(new User
                 {
-                    throw new InvalidOperationException($"Credit amount for Auto type cannot exceed {MaxAutoAmount}.");
-                }
-                break;
-            case CreditTypeEnum.Mortgage:
-                if (creditRequest.CreditAmount > MaxMorgageAmount)
+                    Id = Guid.NewGuid(),
+                    Email = "admin@admin.com",
+                    FullName = "Administrator",
+                    Role = UserRoles.Administrator,
+                });
+                context.SaveChanges();
+            }
+        }
+
+        // Add a new credit request, ensuring the user exists
+        public static Credit AddCreditRequest(this CreditDbContext context, CreditRequestContract creditRequest)
+        {
+            var userId = context.FindOrCreateUser(creditRequest);
+
+            var dbCreditRequest = creditRequest.ToDbCreditRequest(userId);
+
+            ValidateCreditRequest(dbCreditRequest, context);
+
+            context.CreditRequests.Add(dbCreditRequest);
+
+            var credit = new Credit
+            {
+                Id = Guid.NewGuid(),
+                CreditRequestId = dbCreditRequest.Id,
+                Amount = dbCreditRequest.CreditAmount,
+                TypeEnum = dbCreditRequest.CreditType,
+                Status = CreditStatusEnum.Ongoing
+            };
+            context.Credits.Add(credit);
+
+            context.SaveChanges();
+            return credit;
+        }
+
+        private static Guid FindOrCreateUser(this CreditDbContext context, CreditRequestContract creditRequest)
+        {
+            if (!IsValidEmail(creditRequest.Email))
+            {
+                throw new ArgumentException($"Invalid email format for {creditRequest.Email}");
+            }
+
+            var user = context.Users.FirstOrDefault(u => u.Email == creditRequest.Email);
+            if (user == null)
+            {
+                user = new User
                 {
-                    throw new InvalidOperationException($"Credit amount for Mortgage type cannot exceed {MaxMorgageAmount}.");
-                }
-                break;
-            case CreditTypeEnum.Personal:
-                if (creditRequest.CreditAmount > MaxPersonalAmount)
-                {
-                    throw new InvalidOperationException($"Credit amount for Personal type cannot exceed {MaxPersonalAmount}.");
-                }
-                break;
-            default:
-                throw new InvalidOperationException($"Unknown credit type: {creditRequest.CreditType}");
+                    Id = Guid.NewGuid(),
+                    FullName = creditRequest.FullName,
+                    Email = creditRequest.Email,
+                    Role = UserRoles.User
+                };
+                context.Users.Add(user);
+                context.SaveChanges();
+            }
+            return user.Id;
         }
 
-        if (creditRequest.MonthlyIncome <= 0)
+        private static void ValidateCreditRequest(CreditRequest creditRequest, CreditDbContext context)
         {
-            throw new InvalidOperationException("Monthly income must be greater than zero.");
+            if (creditRequest.MonthlyIncome <= 0)
+            {
+                throw new InvalidOperationException("Monthly income must be greater than zero.");
+            }
+
+            switch (creditRequest.CreditType)
+            {
+                case CreditTypeEnum.Auto:
+                    if (creditRequest.CreditAmount > MaxAutoAmount)
+                    {
+                        throw new InvalidOperationException($"Credit amount for Auto type cannot exceed {MaxAutoAmount}.");
+                    }
+                    break;
+                case CreditTypeEnum.Mortgage:
+                    if (creditRequest.CreditAmount > MaxMortgageAmount)
+                    {
+                        throw new InvalidOperationException($"Credit amount for Mortgage type cannot exceed {MaxMortgageAmount}.");
+                    }
+                    break;
+                case CreditTypeEnum.Personal:
+                    if (creditRequest.CreditAmount > MaxPersonalAmount)
+                    {
+                        throw new InvalidOperationException($"Credit amount for Personal type cannot exceed {MaxPersonalAmount}.");
+                    }
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown credit type: {creditRequest.CreditType}");
+            }
+
+            if (creditRequest.CreditAmount <= 0)
+            {
+                throw new InvalidOperationException("Credit amount must be greater than zero.");
+            }
+
+            var creditRequestWithSameUser = context.CreditRequests
+                .FirstOrDefault(cr => cr.Email == creditRequest.Email && cr.CreditType == creditRequest.CreditType);
+            if (creditRequestWithSameUser != null)
+            {
+                throw new InvalidOperationException($"Credit request for this user: {creditRequest.Email} of type: {creditRequest.CreditType} already exists.");
+            }
         }
 
-        if (creditRequest.CreditAmount <= 0)
+        private static CreditRequest ToDbCreditRequest(this CreditRequestContract creditRequest, Guid userId)
         {
-            throw new InvalidOperationException("Credit amount must be greater than zero.");
+            return new CreditRequest
+            {
+                Id = Guid.NewGuid(),
+                FullName = creditRequest.FullName,
+                Email = creditRequest.Email,
+                MonthlyIncome = creditRequest.MonthlyIncome,
+                CreditAmount = creditRequest.CreditAmount,
+                CreditType = creditRequest.TypeEnum,
+                UserId = userId
+            };
         }
 
-        var creditRequestWithSameUser = context.CreditRequests
-            .FirstOrDefault(cr => cr.Email == creditRequest.Email && cr.CreditType == creditRequest.CreditType);
-        if (creditRequestWithSameUser != null)
+        private static bool IsValidEmail(string email)
         {
-            throw new InvalidOperationException($"Credit request for this user: {creditRequest.Email} of type: {creditRequest.CreditType} already exists.");
+            return Regex.IsMatch(email, EmailPattern);
         }
-
-        context.CreditRequests.Add(creditRequest);
-        context.SaveChanges();
-    }
-
-    private static CreditRequest ToDbCreditRequest(this CreditRequestContract creditRequest)
-    {
-        return new CreditRequest
-        {
-            Id = Guid.NewGuid(),
-            FullName = creditRequest.FullName,
-            Email = creditRequest.Email,
-            MonthlyIncome = creditRequest.MonthlyIncome,
-            CreditAmount = creditRequest.CreditAmount,
-            CreditType = creditRequest.TypeEnum
-        };
-    }
-
-    private static bool IsValidEmail(string email)
-    {
-        return Regex.IsMatch(email, EmailPattern);
     }
 }

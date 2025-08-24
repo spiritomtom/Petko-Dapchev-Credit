@@ -2,7 +2,7 @@
 
 namespace CreditBank.Models;
 
-public class Credit(Guid creditRequestId, double amount, CreditTypeEnum typeEnum)
+public class Credit
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid CreditRequestId { get; set; }
