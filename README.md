@@ -25,6 +25,8 @@ To run this project locally, you need to have the following installed:
 
 3. **Run the start-api.bat file and the Swagger page of the api should be displayed along with the console:**
 
+4. **On startup your database should be created and an administrator user will be seeded to use for approving the credit requests:**
+
 ## Usage
 ### Endpoints
 1. **Submit a Credit Request**
