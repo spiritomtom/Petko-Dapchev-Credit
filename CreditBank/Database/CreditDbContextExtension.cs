@@ -1,4 +1,4 @@
-﻿using System.Linq;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 using CreditBank.Contracts;
 using CreditBank.Models;
@@ -42,7 +42,7 @@ namespace CreditBank.Database
         {
             var userId = context.FindOrCreateUser(creditRequest);
 
-            var dbCreditRequest = creditRequest.ToDbCreditRequest(userId);
+            var dbCreditRequest = creditRequest.ToDbCreditRequestModel(userId);
 
             ValidateCreditRequest(dbCreditRequest, context);
 
@@ -129,7 +129,32 @@ namespace CreditBank.Database
             }
         }
 
-        private static CreditRequest ToDbCreditRequest(this CreditRequestContract creditRequest, Guid userId)
+        public static void MakePayment(this CreditDbContext context, Guid creditId, PaymentContract payment)
+        {
+            var credit = context.Credits.Find(creditId);
+            if (credit == null)
+            {
+                throw new ArgumentException($"Credit with id: {creditId} was not found");
+            }
+
+            if (credit.Status is CreditStatusEnum.Finished or CreditStatusEnum.Canceled)
+            {
+                throw new ValidationException( $"Credit: {creditId} is currently not active.");
+            }
+
+            credit.Amount -= payment.Amount;
+            if (credit.Amount <= 0)
+            {
+                credit.Status = CreditStatusEnum.Finished;
+                credit.EndDate = DateTime.UtcNow;
+            }
+
+            context.Payments.Add(payment.ToDbPaymentModel());
+            context.Credits.Update(credit);
+            context.SaveChanges();
+        }
+
+        private static CreditRequest ToDbCreditRequestModel(this CreditRequestContract creditRequest, Guid userId)
         {
             return new CreditRequest
             {
@@ -140,6 +165,18 @@ namespace CreditBank.Database
                 CreditAmount = creditRequest.CreditAmount,
                 CreditType = creditRequest.TypeEnum,
                 UserId = userId
+            };
+        }
+
+        private static Payment ToDbPaymentModel(this PaymentContract paymentContract)
+        {
+            return new Payment
+            {
+                Id = Guid.NewGuid(),
+                Amount = paymentContract.Amount,
+                UserId = paymentContract.UserId,
+                CreditId = paymentContract.CreditId,
+                PaymentDate = DateTime.UtcNow
             };
         }
 

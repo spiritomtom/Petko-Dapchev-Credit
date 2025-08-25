@@ -38,7 +38,12 @@ public class AdministratorController(CreditDbContext context) : ControllerBase
 
             if (creditRequest.CreditAmount > creditRequest.MonthlyIncome * 20)
             {
-                return BadRequest(new { Message = $"Credit request with amount {creditRequest.CreditAmount} could not be approved due to insufficient monthly income." });
+                creditRequest.Status = CreditStatusEnum.Canceled;
+                creditRequest.AdministratorGuid = userId;
+                creditRequest.DateOfApproval = DateTime.UtcNow;
+                context.CreditRequests.Update(creditRequest);
+                await context.SaveChangesAsync().ConfigureAwait(false);
+                return BadRequest(new { Message = $"Credit request {creditRequestId} was denied due to insufficient monthly income." });
             }
 
             creditRequest.Status = CreditStatusEnum.Ongoing;

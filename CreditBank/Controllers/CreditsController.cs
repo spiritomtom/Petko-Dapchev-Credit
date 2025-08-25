@@ -83,5 +83,16 @@ namespace CreditBank.Controllers
 
             return Ok(creditRequestContracts);
         }
+
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [HttpPatch]
+        [Route("{creditId}/payment")]
+        public IActionResult MakePayment([FromRoute] Guid creditId, [FromBody] PaymentContract payment)
+        {
+            _context.MakePayment(creditId, payment);
+            return Ok(new { Message = $"Payment was processed successfully for credit: {creditId}" });
+        }
     }
 }
