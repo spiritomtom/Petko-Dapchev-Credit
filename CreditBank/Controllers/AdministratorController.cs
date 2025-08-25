@@ -9,8 +9,8 @@ namespace CreditBank.Controllers;
 public class AdministratorController(CreditDbContext context) : ControllerBase
 {
     [HttpPatch]
-    [Route("approve/{creditRequestId}")]
-    public async Task<ActionResult> ApproveCreditRequestAsync([FromRoute] Guid creditRequestId, [FromBody] Guid userId)
+    [Route("{userId}/approve/{creditRequestId}")]
+    public async Task<ActionResult> ApproveCreditRequestAsync([FromRoute] Guid userId, [FromRoute] Guid creditRequestId)
     {
         if (creditRequestId == Guid.Empty)
         {
